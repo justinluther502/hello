@@ -9,7 +9,7 @@ use std::{
 
 fn main() {
     let listener = TcpListener::bind("127.0.0.1:7878").unwrap();
-    let pool = ThreadPool::build(0).unwrap_or_else(|error| {
+    let pool = ThreadPool::build(10).unwrap_or_else(|error| {
         eprintln!("Problem creating thread pool: {error}");
         process::exit(1);
     });
@@ -23,22 +23,49 @@ fn main() {
 }
 
 fn handle_connection(mut stream: TcpStream) {
-    let buf_reader = BufReader::new(&mut stream);
-    let request_line = buf_reader.lines().next().unwrap().unwrap();
-
-    let (status_line, filename) = match &request_line[..] {
-        "GET / HTTP/1.1" => ("HTTP/1.1 200 OK", "hello.html"),
-        "GET /sleep HTTP/1.1" => {
-            thread::sleep(Duration::from_secs(5));
-            ("HTTP/1.1 200 OK", "hello.html")
-        },
-        _ => ("HTTP/1.1 404 NOT FOUND", "404.html"),
-    };
-    let page_path = format!("pages/{filename}");
-    let contents = fs::read_to_string(page_path).unwrap();
+    let request = TcpRequest::new(&stream);
+    let status_line = request.response_status_line();
+    let filepath = request.response_html_filestring();
+    let contents = fs::read_to_string(filepath).unwrap();
     let length = contents.len();
     let response = format!(
         "{status_line}\r\nContent-Length: {length}\r\n\r\n{contents}"
     );
     stream.write_all(response.as_bytes()).unwrap();    
+}
+
+struct TcpRequest {
+    _method: String,
+    route: String,
+    _version: String,
+}
+
+impl TcpRequest {
+    pub fn new(stream: &TcpStream) -> TcpRequest {
+        let buf_reader = BufReader::new(stream);
+        let first_request_line = buf_reader.lines().next().unwrap().unwrap();
+        let mut tcp_args = first_request_line.split_whitespace();
+        let method = tcp_args.next().unwrap().to_owned();
+        let route = tcp_args.next().unwrap().to_owned();
+        let version = tcp_args.next().unwrap().to_owned();
+        TcpRequest { _method: method, route, _version: version }
+    }
+
+    pub fn response_status_line(&self) -> String {
+        match &self.route[..] {
+            "/" => String::from("HTTP/1.1 200 OK"),
+            "/sleep" => {
+                thread::sleep(Duration::from_secs(5));
+                String::from("HTTP/1.1 200 OK")
+            }
+            _ => String::from("HTTP/1.1 404 NOT FOUND"),
+        }
+    }
+
+    pub fn response_html_filestring(&self) -> String {
+        match &self.route[..] {
+            "/" | "/sleep" => String::from("pages/hello.html"),
+            _ => String::from("pages/404.html"),
+        }
+    }
 }
