@@ -24,13 +24,7 @@ fn main() {
 
 fn handle_connection(mut stream: TcpStream) {
     let request = TcpRequest::new(&stream);
-    let status_line = request.response_status_line();
-    let filepath = request.response_html_filestring();
-    let contents = fs::read_to_string(filepath).unwrap();
-    let length = contents.len();
-    let response = format!(
-        "{status_line}\r\nContent-Length: {length}\r\n\r\n{contents}"
-    );
+    let response = request.tcp_response();
     stream.write_all(response.as_bytes()).unwrap();    
 }
 
@@ -51,7 +45,17 @@ impl TcpRequest {
         TcpRequest { _method: method, route, _version: version }
     }
 
-    pub fn response_status_line(&self) -> String {
+    pub fn tcp_response(&self) -> String {
+        let status_line = self.response_status_line();
+        let filepath = self.response_html_filestring();
+        let contents = fs::read_to_string(filepath).unwrap();
+        let length = contents.len();
+        format!(
+            "{status_line}\r\nContent-Length: {length}\r\n\r\n{contents}"
+        )  
+    }
+
+    fn response_status_line(&self) -> String {
         match &self.route[..] {
             "/" => String::from("HTTP/1.1 200 OK"),
             "/sleep" => {
@@ -62,7 +66,7 @@ impl TcpRequest {
         }
     }
 
-    pub fn response_html_filestring(&self) -> String {
+    fn response_html_filestring(&self) -> String {
         match &self.route[..] {
             "/" | "/sleep" => String::from("pages/hello.html"),
             _ => String::from("pages/404.html"),
