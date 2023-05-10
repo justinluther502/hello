@@ -57,6 +57,6 @@ pub struct PoolCreationError;
 
 impl fmt::Display for PoolCreationError {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        write!(f, "Number of threads should be a positive integer.")
+        write!(f, "ThreadPool size should be a positive integer.")
     }
 }
