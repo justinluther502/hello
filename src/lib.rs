@@ -1,7 +1,11 @@
 use std::{
     fmt,
+    fs,
+    io::{prelude::*, BufReader},
+    net::TcpStream,
     sync::{mpsc, Arc, Mutex},
     thread,
+    time::Duration,
     vec::Vec,
 };
 
@@ -60,3 +64,50 @@ impl fmt::Display for PoolCreationError {
         write!(f, "ThreadPool size should be a positive integer.")
     }
 }
+
+pub struct TcpConnection {
+    _method: String,
+    route: String,
+    _version: String,
+}
+
+impl TcpConnection {
+    pub fn new(stream: &TcpStream) -> TcpConnection {
+        let buf_reader = BufReader::new(stream);
+        let first_request_line = buf_reader.lines().next().unwrap().unwrap();
+        let mut tcp_args = first_request_line.split_whitespace();
+        let method = tcp_args.next().unwrap().to_owned();
+        let route = tcp_args.next().unwrap().to_owned();
+        let version = tcp_args.next().unwrap().to_owned();
+        TcpConnection { _method: method, route, _version: version }
+    }
+
+    pub fn response(&self) -> String {
+        let status_line = self.response_status_line();
+        let filepath = self.response_html_filestring();
+        let contents = fs::read_to_string(filepath).unwrap();
+        let length = contents.len();
+        format!(
+            "{status_line}\r\nContent-Length: {length}\r\n\r\n{contents}"
+        )  
+    }
+
+    fn response_status_line(&self) -> String {
+        match &self.route[..] {
+            "/" => String::from("HTTP/1.1 200 OK"),
+            "/sleep" => {
+                thread::sleep(Duration::from_secs(5));
+                String::from("HTTP/1.1 200 OK")
+            }
+            _ => String::from("HTTP/1.1 404 NOT FOUND"),
+        }
+    }
+
+    fn response_html_filestring(&self) -> String {
+        match &self.route[..] {
+            "/" | "/sleep" => String::from("pages/hello.html"),
+            _ => String::from("pages/404.html"),
+        }
+    }
+}
+
