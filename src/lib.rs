@@ -1,6 +1,5 @@
 use std::{
-    fmt,
-    fs,
+    fmt, fs,
     io::{prelude::*, BufReader},
     net::TcpStream,
     sync::{mpsc, Arc, Mutex},
@@ -23,14 +22,17 @@ impl ThreadPool {
             for id in 0..size {
                 workers.push(Worker::new(id, Arc::clone(&receiver)));
             }
-            Ok(ThreadPool { _workers: workers, sender: Some(sender) })
+            Ok(ThreadPool {
+                _workers: workers,
+                sender: Some(sender),
+            })
         } else {
             Err(PoolCreationError)
         }
     }
 
     pub fn execute<F>(&self, f: F)
-    where 
+    where
         F: FnOnce() + Send + 'static,
     {
         let job = Box::new(f);
@@ -55,7 +57,7 @@ type Job = Box<dyn FnOnce() + Send + 'static>;
 
 struct Worker {
     _id: usize,
-    _thread: Option<thread::JoinHandle<()>>
+    _thread: Option<thread::JoinHandle<()>>,
 }
 
 impl Worker {
@@ -66,15 +68,17 @@ impl Worker {
                 Ok(job) => {
                     println!("Worker {id} got a job; executing.");
                     job();
-                },
+                }
                 Err(_) => {
                     println!("Worker {id} disconnected; shutting down.");
                     break;
                 }
             }
-            
         });
-        Worker { _id: id, _thread: Some(thread) }
+        Worker {
+            _id: id,
+            _thread: Some(thread),
+        }
     }
 }
 
@@ -101,7 +105,11 @@ impl TcpConnection {
         let method = tcp_args.next().unwrap().to_owned();
         let route = tcp_args.next().unwrap().to_owned();
         let version = tcp_args.next().unwrap().to_owned();
-        TcpConnection { _method: method, route, _version: version }
+        TcpConnection {
+            _method: method,
+            route,
+            _version: version,
+        }
     }
 
     pub fn response(&self) -> String {
@@ -109,9 +117,7 @@ impl TcpConnection {
         let filepath = self.response_html_filestring();
         let contents = fs::read_to_string(filepath).unwrap();
         let length = contents.len();
-        format!(
-            "{status_line}\r\nContent-Length: {length}\r\n\r\n{contents}"
-        )  
+        format!("{status_line}\r\nContent-Length: {length}\r\n\r\n{contents}")
     }
 
     fn response_status_line(&self) -> String {
@@ -132,4 +138,3 @@ impl TcpConnection {
         }
     }
 }
-
