@@ -9,7 +9,10 @@ use std::{
 pub fn handle_connection(mut stream: TcpStream) {
     let connection = TcpConnection::new(&stream);
     let response = connection.response();
-    stream.write_all(response.as_bytes()).unwrap();
+    stream.write_all(response.as_bytes()).unwrap_or_else(|error| {
+        eprintln!("Problem writing response to TCP stream: {error}.");
+        process::exit(1);
+    });
 }
 
 pub fn listen(port: &str) -> TcpListener {
