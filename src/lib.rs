@@ -11,7 +11,7 @@ use std::{
 
 pub struct ThreadPool {
     _workers: Vec<Worker>,
-    sender: mpsc::Sender<Job>,
+    sender: Option<mpsc::Sender<Job>>,
 }
 
 impl ThreadPool {
@@ -23,7 +23,7 @@ impl ThreadPool {
             for id in 0..size {
                 workers.push(Worker::new(id, Arc::clone(&receiver)));
             }
-            Ok(ThreadPool { _workers: workers, sender })
+            Ok(ThreadPool { _workers: workers, sender: Some(sender) })
         } else {
             Err(PoolCreationError)
         }
@@ -34,7 +34,20 @@ impl ThreadPool {
         F: FnOnce() + Send + 'static,
     {
         let job = Box::new(f);
-        self.sender.send(job).unwrap();
+        self.sender.as_ref().unwrap().send(job).unwrap();
+    }
+}
+
+impl Drop for ThreadPool {
+    fn drop(&mut self) {
+        drop(self.sender.take());
+
+        for worker in &mut self._workers {
+            println!("Shutting down worker {}", worker._id);
+            if let Some(thread) = worker._thread.take() {
+                thread.join().unwrap()
+            }
+        }
     }
 }
 
@@ -42,17 +55,26 @@ type Job = Box<dyn FnOnce() + Send + 'static>;
 
 struct Worker {
     _id: usize,
-    _thread: thread::JoinHandle<()>
+    _thread: Option<thread::JoinHandle<()>>
 }
 
 impl Worker {
     fn new(id: usize, receiver: Arc<Mutex<mpsc::Receiver<Job>>>) -> Worker {
         let thread = thread::spawn(move || loop {
-            let job = receiver.lock().unwrap().recv().unwrap();
-            println!("Worker {id} got a job; executing.");
-            job();
+            let message = receiver.lock().unwrap().recv();
+            match message {
+                Ok(job) => {
+                    println!("Worker {id} got a job; executing.");
+                    job();
+                },
+                Err(_) => {
+                    println!("Worker {id} disconnected; shutting down.");
+                    break;
+                }
+            }
+            
         });
-        Worker { _id: id, _thread: thread }
+        Worker { _id: id, _thread: Some(thread) }
     }
 }
 
