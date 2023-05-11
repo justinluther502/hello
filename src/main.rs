@@ -1,14 +1,13 @@
-use hello::{TcpConnection, ThreadPool};
-use std::{
-    io::prelude::*,
-    net::{TcpListener, TcpStream},
-    process,
-};
+use hello::ThreadPool;
+use std::process;
+
+mod connection;
 mod parameters;
-use parameters::*;
+use connection::{handle_connection, listen};
+use parameters::{CONNS_BEFORE_QUIT, MAX_WORKERS, PORT};
 
 fn main() {
-    let listener = TcpListener::bind(PORT).unwrap();
+    let listener = listen(PORT);
     let pool = make_threadpool(MAX_WORKERS);
 
     for stream in listener.incoming().take(CONNS_BEFORE_QUIT) {
@@ -18,12 +17,6 @@ fn main() {
         });
     }
     println!("Shutting down.")
-}
-
-fn handle_connection(mut stream: TcpStream) {
-    let connection = TcpConnection::new(&stream);
-    let response = connection.response();
-    stream.write_all(response.as_bytes()).unwrap();
 }
 
 fn make_threadpool(size: usize) -> ThreadPool {
