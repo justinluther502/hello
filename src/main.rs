@@ -1,10 +1,9 @@
-use hello::ThreadPool;
-use std::process;
-
 mod connection;
 mod parameters;
+mod threadpool;
 use connection::{handle_connection, listen};
 use parameters::{CONNS_BEFORE_QUIT, MAX_WORKERS, PORT};
+use threadpool::make_threadpool;
 
 fn main() {
     let listener = listen(PORT);
@@ -17,11 +16,4 @@ fn main() {
         });
     }
     println!("Shutting down.")
-}
-
-fn make_threadpool(size: usize) -> ThreadPool {
-    ThreadPool::build(size).unwrap_or_else(|error| {
-        eprintln!("Problem creating thread pool: {error}");
-        process::exit(1);
-    })
 }

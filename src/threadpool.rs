@@ -1,12 +1,16 @@
 use std::{
-    fmt, fs,
-    io::{prelude::*, BufReader},
-    net::TcpStream,
+    fmt, process,
     sync::{mpsc, Arc, Mutex},
     thread,
-    time::Duration,
     vec::Vec,
 };
+
+pub fn make_threadpool(size: usize) -> ThreadPool {
+    ThreadPool::build(size).unwrap_or_else(|error| {
+        eprintln!("Problem creating thread pool: {error}");
+        process::exit(1);
+    })
+}
 
 pub struct ThreadPool {
     _workers: Vec<Worker>,
